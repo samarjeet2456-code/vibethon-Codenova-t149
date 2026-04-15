@@ -28,9 +28,12 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh auth session (typed-safe for current Supabase middleware client)
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user ?? null
+  // Refresh auth session (compatible across Supabase auth typings in different environments)
+  type AuthWithGetUser = {
+    getUser: () => Promise<{ data: { user: unknown | null } }>
+  }
+  const authClient = supabase.auth as unknown as AuthWithGetUser
+  const { data: { user } } = await authClient.getUser()
 
   const { pathname } = request.nextUrl
   const isPublic = PUBLIC_ROUTES.some(route => pathname.startsWith(route))
