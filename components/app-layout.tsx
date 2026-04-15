@@ -1,28 +1,50 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AppSidebar } from './app-sidebar'
 import { Topbar } from './topbar'
-import { useAppStore } from '@/lib/store'
+import { getSupabaseClient } from '@/lib/supabase'
 
 interface AppLayoutProps {
   children: React.ReactNode
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { user } = useAppStore()
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
-    // Redirect to login if not logged in
-    if (!user.isLoggedIn) {
-      router.push('/login')
+    const supabase = getSupabaseClient()
+
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession()
+      const loggedIn = Boolean(data.session?.user)
+      setIsLoggedIn(loggedIn)
+      setIsCheckingAuth(false)
+      if (!loggedIn) {
+        router.push('/login')
+      }
     }
-  }, [user.isLoggedIn, router])
+
+    checkSession()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const loggedIn = Boolean(session?.user)
+      setIsLoggedIn(loggedIn)
+      if (!loggedIn) {
+        router.push('/login')
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [router])
 
   // Show nothing while checking auth
-  if (!user.isLoggedIn) {
+  if (isCheckingAuth || !isLoggedIn) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Loading...</div>

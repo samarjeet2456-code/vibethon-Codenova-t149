@@ -7,25 +7,58 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useAppStore } from '@/lib/store'
+import { getSupabaseClient } from '@/lib/supabase'
 import { motion } from 'framer-motion'
-import { Brain, Sparkles, ArrowRight } from 'lucide-react'
+import { Brain, Sparkles, ArrowRight, AlertCircle } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const { login, loginAsGuest } = useAppStore()
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    login('User', email)
-    router.push('/mode-select')
+    setError('')
+    setLoading(true)
+
+    try {
+      const supabase = getSupabaseClient()
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+
+      if (authError) {
+        setError(authError.message)
+        return
+      }
+
+      router.push('/mode-select')
+      router.refresh()
+    } catch {
+      setError('An unexpected error occurred. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleGuestLogin = () => {
-    loginAsGuest()
-    router.push('/mode-select')
+  const handleGuestLogin = async () => {
+    setLoading(true)
+    try {
+      const supabase = getSupabaseClient()
+      // Sign in with a shared guest account (anonymous-style)
+      const { error: authError } = await supabase.auth.signInAnonymously()
+      if (authError) {
+        // Fallback: skip auth for guest and go directly, store will handle it
+        setError(authError.message)
+        return
+      }
+      router.push('/mode-select')
+      router.refresh()
+    } catch {
+      setError('Could not start guest session.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -44,7 +77,6 @@ export default function LoginPage() {
       >
         <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
           <CardHeader className="text-center pb-2">
-            {/* Logo */}
             <div className="flex justify-center mb-4">
               <motion.div
                 initial={{ scale: 0 }}
@@ -60,9 +92,7 @@ export default function LoginPage() {
                 AIML Learning Platform
               </span>
             </CardTitle>
-            <CardDescription>
-              Sign in to continue your AI/ML journey
-            </CardDescription>
+            <CardDescription>Sign in to continue your AI/ML journey</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <form onSubmit={handleLogin} className="space-y-4">
@@ -76,6 +106,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="bg-secondary/50 border-border/50"
                   required
+                  disabled={loading}
                 />
               </div>
               <div className="space-y-2">
@@ -88,11 +119,21 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="bg-secondary/50 border-border/50"
                   required
+                  disabled={loading}
                 />
               </div>
-              <Button type="submit" className="w-full gap-2">
-                Sign In
-                <ArrowRight className="h-4 w-4" />
+
+              {error && (
+                <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              <Button type="submit" className="w-full gap-2" disabled={loading}>
+                {loading ? 'Signing in...' : (
+                  <>Sign In <ArrowRight className="h-4 w-4" /></>
+                )}
               </Button>
             </form>
 
@@ -109,6 +150,7 @@ export default function LoginPage() {
               variant="outline"
               className="w-full gap-2 border-primary/30 hover:bg-primary/10"
               onClick={handleGuestLogin}
+              disabled={loading}
             >
               <Sparkles className="h-4 w-4 text-primary" />
               Continue as Guest

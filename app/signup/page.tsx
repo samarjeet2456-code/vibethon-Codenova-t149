@@ -7,9 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useAppStore } from '@/lib/store'
+import { getSupabaseClient } from '@/lib/supabase'
 import { motion } from 'framer-motion'
-import { Brain, ArrowRight, Check } from 'lucide-react'
+import { Brain, ArrowRight, Check, AlertCircle, Mail } from 'lucide-react'
 
 export default function SignupPage() {
   const [name, setName] = useState('')
@@ -17,30 +17,84 @@ export default function SignupPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
-  const { signup } = useAppStore()
+  const [success, setSuccess] = useState(false)
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    
+
     if (password !== confirmPassword) {
       setError('Passwords do not match')
       return
     }
-    
     if (password.length < 6) {
       setError('Password must be at least 6 characters')
       return
     }
-    
-    signup(name, email)
-    router.push('/mode-select')
+
+    setLoading(true)
+    try {
+      const supabase = getSupabaseClient()
+      const { error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { name },
+          emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+        },
+      })
+
+      if (authError) {
+        setError(authError.message)
+        return
+      }
+
+      setSuccess(true)
+    } catch {
+      setError('An unexpected error occurred. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md"
+        >
+          <Card className="border-border/50 bg-card/80 backdrop-blur-sm text-center">
+            <CardContent className="pt-8 pb-8 space-y-4">
+              <div className="flex justify-center">
+                <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Mail className="h-8 w-8 text-primary" />
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold">Check your email!</h2>
+              <p className="text-muted-foreground">
+                We&apos;ve sent a confirmation link to <strong>{email}</strong>.
+                Click it to activate your account.
+              </p>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => router.push('/login')}
+              >
+                Back to Login
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      {/* Background effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
@@ -54,7 +108,6 @@ export default function SignupPage() {
       >
         <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
           <CardHeader className="text-center pb-2">
-            {/* Logo */}
             <div className="flex justify-center mb-4">
               <motion.div
                 initial={{ scale: 0 }}
@@ -66,9 +119,7 @@ export default function SignupPage() {
               </motion.div>
             </div>
             <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-            <CardDescription>
-              Join the AI/ML learning community
-            </CardDescription>
+            <CardDescription>Join the AI/ML learning community</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <form onSubmit={handleSignup} className="space-y-4">
@@ -82,6 +133,7 @@ export default function SignupPage() {
                   onChange={(e) => setName(e.target.value)}
                   className="bg-secondary/50 border-border/50"
                   required
+                  disabled={loading}
                 />
               </div>
               <div className="space-y-2">
@@ -94,6 +146,7 @@ export default function SignupPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="bg-secondary/50 border-border/50"
                   required
+                  disabled={loading}
                 />
               </div>
               <div className="space-y-2">
@@ -101,11 +154,12 @@ export default function SignupPage() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Create a password"
+                  placeholder="Create a password (min 6 chars)"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="bg-secondary/50 border-border/50"
                   required
+                  disabled={loading}
                 />
               </div>
               <div className="space-y-2">
@@ -118,16 +172,21 @@ export default function SignupPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="bg-secondary/50 border-border/50"
                   required
+                  disabled={loading}
                 />
               </div>
-              
+
               {error && (
-                <p className="text-sm text-destructive">{error}</p>
+                <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  {error}
+                </div>
               )}
 
-              <Button type="submit" className="w-full gap-2">
-                <Check className="h-4 w-4" />
-                Create Account
+              <Button type="submit" className="w-full gap-2" disabled={loading}>
+                {loading ? 'Creating account...' : (
+                  <><Check className="h-4 w-4" /> Create Account</>
+                )}
               </Button>
             </form>
 

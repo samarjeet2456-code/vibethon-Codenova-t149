@@ -1,20 +1,20 @@
 'use client'
 
-import { use, useState } from 'react'
+import { use, useState, useEffect } from 'react'
 import { AppLayout } from '@/components/app-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useAppStore } from '@/lib/store'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  Play, 
-  CheckCircle2, 
+import {
+  Play,
+  CheckCircle2,
   Zap,
   ArrowLeft,
   Lightbulb,
   ChevronDown,
   Terminal,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react'
 import Link from 'next/link'
 import {
@@ -24,19 +24,63 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
+interface Problem {
+  id: number
+  name: string
+  topic: string
+  difficulty: 'Easy' | 'Medium' | 'Hard'
+  xp: number
+  description: string
+  example: string
+  explanation: string
+  starter_code: string
+  solved?: boolean
+}
+
 const languages = ['Python', 'JavaScript', 'TypeScript', 'Java', 'C++']
 
 export default function ProblemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
-  const { problems, solveProblem } = useAppStore()
-  const problem = problems.find(p => p.id === parseInt(resolvedParams.id))
-  
+
+  const [problem, setProblem] = useState<Problem | null>(null)
+  const [loading, setLoading] = useState(true)
   const [selectedLanguage, setSelectedLanguage] = useState('Python')
-  const [code, setCode] = useState(problem?.starterCode || '')
+  const [code, setCode] = useState('')
   const [output, setOutput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
   const [showExplanation, setShowExplanation] = useState(false)
   const [showXpAnimation, setShowXpAnimation] = useState(false)
+  const [xpEarned, setXpEarned] = useState(0)
+  const [solved, setSolved] = useState(false)
+
+  useEffect(() => {
+    async function fetchProblem() {
+      try {
+        const res = await fetch(`/api/problems/${resolvedParams.id}`)
+        const data = await res.json()
+        if (data.problem) {
+          setProblem(data.problem)
+          setCode(data.problem.starter_code || '')
+          setSolved(data.problem.solved ?? false)
+        }
+      } catch (err) {
+        console.error('Failed to fetch problem:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProblem()
+  }, [resolvedParams.id])
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    )
+  }
 
   if (!problem) {
     return (
@@ -51,41 +95,60 @@ export default function ProblemDetailPage({ params }: { params: Promise<{ id: st
   const handleRun = async () => {
     setIsRunning(true)
     setOutput('')
-    
-    // Simulate running code
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    setOutput(`Running ${problem.name}...\n\n✓ Test case 1 passed\n✓ Test case 2 passed\n✓ Test case 3 passed\n\nAll tests passed! 🎉`)
-    setIsRunning(false)
+    try {
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          language: selectedLanguage,
+          problemId: problem.id,
+          isSubmit: false,
+        }),
+      })
+      const data = await res.json()
+      setOutput(data.output || data.error || 'No output')
+    } catch {
+      setOutput('Error connecting to execution engine.')
+    } finally {
+      setIsRunning(false)
+    }
   }
 
   const handleSubmit = async () => {
-    if (problem.solved) return
-    
+    if (solved) return
     setIsRunning(true)
     setOutput('')
-    
-    // Simulate submission
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    setOutput(`Submitting solution...\n\n✓ Test case 1 passed\n✓ Test case 2 passed\n✓ Test case 3 passed\n✓ Test case 4 passed\n✓ Test case 5 passed\n\nAccepted! +${problem.xp} XP 🎉`)
-    setIsRunning(false)
-    
-    // Show XP animation
-    setShowXpAnimation(true)
-    setTimeout(() => setShowXpAnimation(false), 2000)
-    
-    // Update store
-    solveProblem(problem.id)
+    try {
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          language: selectedLanguage,
+          problemId: problem.id,
+          isSubmit: true,
+        }),
+      })
+      const data = await res.json()
+      setOutput(data.output || data.error || 'No output')
+
+      if (data.accepted) {
+        setSolved(true)
+        setXpEarned(data.xpEarned)
+        setShowXpAnimation(true)
+        setTimeout(() => setShowXpAnimation(false), 2500)
+      }
+    } catch {
+      setOutput('Error connecting to execution engine.')
+    } finally {
+      setIsRunning(false)
+    }
   }
 
   return (
     <AppLayout>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="space-y-4"
-      >
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
         {/* XP Animation */}
         <AnimatePresence>
           {showXpAnimation && (
@@ -97,7 +160,7 @@ export default function ProblemDetailPage({ params }: { params: Promise<{ id: st
             >
               <div className="bg-primary/90 text-primary-foreground px-8 py-4 rounded-2xl flex items-center gap-3 shadow-2xl">
                 <Sparkles className="h-8 w-8" />
-                <span className="text-3xl font-bold">+{problem.xp} XP</span>
+                <span className="text-3xl font-bold">+{xpEarned} XP</span>
               </div>
             </motion.div>
           )}
@@ -114,9 +177,7 @@ export default function ProblemDetailPage({ params }: { params: Promise<{ id: st
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-xl font-bold">{problem.name}</h1>
-                {problem.solved && (
-                  <CheckCircle2 className="h-5 w-5 text-success" />
-                )}
+                {solved && <CheckCircle2 className="h-5 w-5 text-success" />}
               </div>
               <div className="flex items-center gap-3 mt-1">
                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${
@@ -136,23 +197,19 @@ export default function ProblemDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
 
-        {/* Main Content - Split Layout */}
+        {/* Split Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-200px)]">
           {/* Left - Problem Description */}
           <div className="space-y-4 overflow-auto pr-2">
             <Card>
-              <CardHeader>
-                <CardTitle>Description</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle>Description</CardTitle></CardHeader>
               <CardContent>
                 <p className="text-foreground leading-relaxed">{problem.description}</p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Example</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle>Example</CardTitle></CardHeader>
               <CardContent>
                 <pre className="bg-secondary p-4 rounded-lg text-sm font-mono overflow-x-auto">
                   {problem.example}
@@ -168,7 +225,7 @@ export default function ProblemDetailPage({ params }: { params: Promise<{ id: st
                 >
                   <CardTitle className="flex items-center gap-2">
                     <Lightbulb className="h-5 w-5 text-warning" />
-                    Explanation
+                    Explanation / Hint
                   </CardTitle>
                   <ChevronDown className={`h-5 w-5 transition-transform ${showExplanation ? 'rotate-180' : ''}`} />
                 </button>
@@ -235,13 +292,8 @@ export default function ProblemDetailPage({ params }: { params: Promise<{ id: st
                 <div className="bg-secondary/50 p-4 rounded-lg min-h-[120px] font-mono text-sm">
                   {isRunning ? (
                     <div className="flex items-center gap-2 text-muted-foreground">
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      >
-                        <Play className="h-4 w-4" />
-                      </motion.div>
-                      Running...
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Running your code...
                     </div>
                   ) : output ? (
                     <pre className="whitespace-pre-wrap">{output}</pre>
@@ -254,30 +306,15 @@ export default function ProblemDetailPage({ params }: { params: Promise<{ id: st
 
             {/* Action Buttons */}
             <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1 gap-2"
-                onClick={handleRun}
-                disabled={isRunning}
-              >
-                <Play className="h-4 w-4" />
+              <Button variant="outline" className="flex-1 gap-2" onClick={handleRun} disabled={isRunning}>
+                {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                 Run
               </Button>
-              <Button
-                className="flex-1 gap-2"
-                onClick={handleSubmit}
-                disabled={isRunning || problem.solved}
-              >
-                {problem.solved ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4" />
-                    Solved
-                  </>
+              <Button className="flex-1 gap-2" onClick={handleSubmit} disabled={isRunning || solved}>
+                {solved ? (
+                  <><CheckCircle2 className="h-4 w-4" /> Solved</>
                 ) : (
-                  <>
-                    <Zap className="h-4 w-4" />
-                    Submit
-                  </>
+                  <><Zap className="h-4 w-4" /> Submit</>
                 )}
               </Button>
             </div>
