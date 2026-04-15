@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/app-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
+import Link from 'next/link'
 import { 
   Brain, 
   BookOpen, 
@@ -240,9 +241,11 @@ export default function AboutPage() {
           <p className="text-muted-foreground mb-6">
             Begin your AI/ML journey today and join thousands of learners worldwide.
           </p>
-          <Button size="lg" className="gap-2">
-            <Zap className="h-4 w-4" />
-            Get Started Now
+          <Button size="lg" className="gap-2" asChild>
+            <Link href="/learn">
+              <Zap className="h-4 w-4" />
+              Get Started Now
+            </Link>
           </Button>
         </motion.div>
       </motion.div>

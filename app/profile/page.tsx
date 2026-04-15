@@ -5,10 +5,12 @@ import { AppLayout } from '@/components/app-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { motion } from 'framer-motion'
 import {
   Zap, Flame, Trophy, Target, CheckCircle2,
-  TrendingUp, Calendar, Award, Star, Sparkles, Settings, Loader2
+  TrendingUp, Calendar, Award, Star, Sparkles, Settings, Loader2, Save
 } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { getSupabaseClient } from '@/lib/supabase'
@@ -48,6 +50,10 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [userRank, setUserRank] = useState<number | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editLearningLevel, setEditLearningLevel] = useState('beginner')
 
   useEffect(() => {
     async function load() {
@@ -63,7 +69,12 @@ export default function ProfilePage() {
         ])
 
         const profileData = await profileRes.json()
-        setProfile(profileData.profile ?? null)
+        const loadedProfile = profileData.profile ?? null
+        setProfile(loadedProfile)
+        if (loadedProfile) {
+          setEditName(loadedProfile.name ?? '')
+          setEditLearningLevel(loadedProfile.learning_level ?? 'beginner')
+        }
 
         const lbData = await lbRes.json()
         const rankEntry = (lbData.leaderboard ?? []).find((e: { id: string; rank: number }) => e.id === user.id)
@@ -76,6 +87,37 @@ export default function ProfilePage() {
     }
     load()
   }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('edit') === 'true') {
+      setIsEditing(true)
+    }
+  }, [])
+
+  const handleSaveProfile = async () => {
+    if (!profile) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editName.trim(),
+          learning_level: editLearningLevel,
+        }),
+      })
+
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.profile) {
+        setProfile((prev) => prev ? { ...prev, ...data.profile } : prev)
+      }
+      setIsEditing(false)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -131,9 +173,9 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 </div>
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="gap-2" onClick={() => setIsEditing((prev) => !prev)}>
                   <Settings className="h-4 w-4" />
-                  Edit Profile
+                  {isEditing ? 'Cancel' : 'Edit Profile'}
                 </Button>
               </div>
               <div className="mt-6">
@@ -146,6 +188,44 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
         </motion.div>
+
+        {isEditing && (
+          <motion.div variants={item}>
+            <Card>
+              <CardHeader>
+                <CardTitle>Edit Profile</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="profile-name">Name</Label>
+                  <Input
+                    id="profile-name"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Your name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="learning-level">Learning Level</Label>
+                  <select
+                    id="learning-level"
+                    value={editLearningLevel}
+                    onChange={(e) => setEditLearningLevel(e.target.value)}
+                    className="w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm outline-none"
+                  >
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                </div>
+                <Button onClick={handleSaveProfile} disabled={saving} className="gap-2">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save Changes
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Stats Grid */}
         <motion.div variants={item} className="grid grid-cols-2 md:grid-cols-4 gap-4">

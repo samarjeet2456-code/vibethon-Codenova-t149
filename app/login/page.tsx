@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getSupabaseClient } from '@/lib/supabase'
 import { motion } from 'framer-motion'
-import { Brain, Sparkles, ArrowRight, AlertCircle } from 'lucide-react'
+import { Brain, ArrowRight, AlertCircle } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -36,26 +36,6 @@ export default function LoginPage() {
       router.refresh()
     } catch {
       setError('An unexpected error occurred. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleGuestLogin = async () => {
-    setLoading(true)
-    try {
-      const supabase = getSupabaseClient()
-      // Sign in with a shared guest account (anonymous-style)
-      const { error: authError } = await supabase.auth.signInAnonymously()
-      if (authError) {
-        // Fallback: skip auth for guest and go directly, store will handle it
-        setError(authError.message)
-        return
-      }
-      router.push('/mode-select')
-      router.refresh()
-    } catch {
-      setError('Could not start guest session.')
     } finally {
       setLoading(false)
     }
@@ -136,25 +116,6 @@ export default function LoginPage() {
                 )}
               </Button>
             </form>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border/50" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or</span>
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              className="w-full gap-2 border-primary/30 hover:bg-primary/10"
-              onClick={handleGuestLogin}
-              disabled={loading}
-            >
-              <Sparkles className="h-4 w-4 text-primary" />
-              Continue as Guest
-            </Button>
 
             <p className="text-center text-sm text-muted-foreground">
               Don&apos;t have an account?{' '}

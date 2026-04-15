@@ -107,6 +107,10 @@ export default function ProblemDetailPage({ params }: { params: Promise<{ id: st
         }),
       })
       const data = await res.json()
+      if (!res.ok) {
+        setOutput(data.error || 'Code execution failed.')
+        return
+      }
       setOutput(data.output || data.error || 'No output')
     } catch {
       setOutput('Error connecting to execution engine.')
@@ -131,6 +135,10 @@ export default function ProblemDetailPage({ params }: { params: Promise<{ id: st
         }),
       })
       const data = await res.json()
+      if (!res.ok) {
+        setOutput(data.error || 'Submission failed.')
+        return
+      }
       setOutput(data.output || data.error || 'No output')
 
       if (data.accepted) {
@@ -167,8 +175,8 @@ export default function ProblemDetailPage({ params }: { params: Promise<{ id: st
         </AnimatePresence>
 
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+          <div className="flex items-start gap-3 sm:items-center sm:gap-4">
             <Link href="/problems">
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-5 w-5" />
@@ -198,9 +206,9 @@ export default function ProblemDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* Split Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-200px)]">
+        <div className="grid h-auto grid-cols-1 gap-4 lg:h-[calc(100vh-200px)] lg:grid-cols-2">
           {/* Left - Problem Description */}
-          <div className="space-y-4 overflow-auto pr-2">
+          <div className="space-y-4 overflow-visible pr-0 lg:overflow-auto lg:pr-2">
             <Card>
               <CardHeader><CardTitle>Description</CardTitle></CardHeader>
               <CardContent>
@@ -269,7 +277,7 @@ export default function ProblemDetailPage({ params }: { params: Promise<{ id: st
                 </DropdownMenu>
               </CardHeader>
               <CardContent className="flex-1 p-0">
-                <div className="h-full border-t border-border">
+                <div className="min-h-[280px] border-t border-border lg:h-full">
                   <textarea
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
@@ -305,7 +313,7 @@ export default function ProblemDetailPage({ params }: { params: Promise<{ id: st
             </Card>
 
             {/* Action Buttons */}
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <Button variant="outline" className="flex-1 gap-2" onClick={handleRun} disabled={isRunning}>
                 {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                 Run

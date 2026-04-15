@@ -38,9 +38,18 @@ export async function POST(_req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    let xpEarned = 0
+    try {
+      const body = await _req.json()
+      xpEarned = Number(body?.xpEarned ?? 0)
+      if (!Number.isFinite(xpEarned) || xpEarned < 0) xpEarned = 0
+    } catch {
+      // Allow empty body for existing streak-only requests.
+    }
+
     const { data: profile } = await supabase
       .from('profiles')
-      .select('streak, last_active')
+      .select('streak, last_active, xp')
       .eq('id', user.id)
       .single()
 
@@ -55,12 +64,20 @@ export async function POST(_req: NextRequest) {
       newStreak = 1
     }
 
+    const newXp = (profile?.xp ?? 0) + xpEarned
+    const newLevel = Math.floor(newXp / 500) + 1
+
     await supabase
       .from('profiles')
-      .update({ streak: newStreak, last_active: today })
+      .update({
+        streak: newStreak,
+        last_active: today,
+        xp: newXp,
+        level: newLevel,
+      })
       .eq('id', user.id)
 
-    return NextResponse.json({ streak: newStreak })
+    return NextResponse.json({ streak: newStreak, xp: newXp, level: newLevel })
   } catch (error) {
     console.error('POST /api/leaderboard error:', error)
     return NextResponse.json({ error: 'Failed to update streak' }, { status: 500 })

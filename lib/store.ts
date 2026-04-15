@@ -47,12 +47,41 @@ export const useUIStore = create<UIState>((set) => ({
 // ─── Legacy store (kept for backwards compat during migration) ────────────────
 // TODO: Remove once all pages are migrated to API-based data fetching
 
+interface GameScore {
+  gameId: string
+  score: number
+  highScore: number
+}
+
 interface LegacyState {
   learningLevel: LearningLevel
   setLearningLevel: (level: LearningLevel) => void
+  gameScores: GameScore[]
+  updateGameScore: (gameId: string, score: number) => void
+  addXp: (xp: number) => void
 }
 
 export const useAppStore = create<LegacyState>((set) => ({
   learningLevel: 'beginner',
   setLearningLevel: (level) => set({ learningLevel: level }),
+  gameScores: [],
+  updateGameScore: (gameId, score) =>
+    set((state) => {
+      const existing = state.gameScores.find((g) => g.gameId === gameId)
+      if (existing) {
+        return {
+          gameScores: state.gameScores.map((g) =>
+            g.gameId === gameId
+              ? { ...g, score, highScore: Math.max(g.highScore, score) }
+              : g
+          ),
+        }
+      }
+      return {
+        gameScores: [...state.gameScores, { gameId, score, highScore: score }],
+      }
+    }),
+  addXp: () => {
+    // XP is now managed server-side via Supabase; this is a no-op locally
+  },
 }))

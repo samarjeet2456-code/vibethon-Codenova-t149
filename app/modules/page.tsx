@@ -1,17 +1,18 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { AppLayout } from '@/components/app-layout'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { useAppStore } from '@/lib/store'
 import { motion } from 'framer-motion'
 import { 
   BookOpen, 
   CheckCircle2, 
   ArrowRight,
   Lock,
-  Zap
+  Zap,
+  Loader2
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -30,12 +31,58 @@ const item = {
   show: { opacity: 1, y: 0 }
 }
 
-export default function ModulesPage() {
-  const { modules, problems } = useAppStore()
+interface Module {
+  id: number
+  name: string
+  description: string
+  problem_ids: number[]
+  order_index: number
+}
 
-  const getModuleProgress = (module: typeof modules[0]) => {
-    const moduleProblems = problems.filter(p => module.problems.includes(p.id))
-    const solvedCount = moduleProblems.filter(p => p.solved).length
+interface Problem {
+  id: number
+  name: string
+  xp: number
+}
+
+interface ProgressMap {
+  [problemId: number]: { solved: boolean; attempts: number; solvedAt: string | null }
+}
+
+export default function ModulesPage() {
+  const [modules, setModules] = useState<Module[]>([])
+  const [problems, setProblems] = useState<Problem[]>([])
+  const [progress, setProgress] = useState<ProgressMap>({})
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [modulesRes, problemsRes, progressRes] = await Promise.all([
+          fetch('/api/modules'),
+          fetch('/api/problems'),
+          fetch('/api/progress'),
+        ])
+
+        const modulesData = await modulesRes.json()
+        const problemsData = await problemsRes.json()
+        const progressData = progressRes.ok ? await progressRes.json() : { progress: {} }
+
+        setModules(modulesData.modules ?? [])
+        setProblems(problemsData.problems ?? [])
+        setProgress(progressData.progress ?? {})
+      } catch (err) {
+        console.error('Failed to load modules data:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  const getModuleProgress = (mod: Module) => {
+    const moduleProblems = problems.filter(p => mod.problem_ids.includes(p.id))
+    const solvedCount = moduleProblems.filter(p => progress[p.id]?.solved).length
     return {
       solved: solvedCount,
       total: moduleProblems.length,
@@ -43,18 +90,28 @@ export default function ModulesPage() {
     }
   }
 
-  const getModuleXp = (module: typeof modules[0]) => {
+  const getModuleXp = (mod: Module) => {
     return problems
-      .filter(p => module.problems.includes(p.id))
+      .filter(p => mod.problem_ids.includes(p.id))
       .reduce((acc, p) => acc + p.xp, 0)
   }
 
-  const isModuleUnlocked = (moduleOrder: number) => {
-    if (moduleOrder === 1) return true
-    const prevModule = modules.find(m => m.order === moduleOrder - 1)
+  const isModuleUnlocked = (orderIndex: number) => {
+    if (orderIndex === 1) return true
+    const prevModule = modules.find(m => m.order_index === orderIndex - 1)
     if (!prevModule) return true
-    const progress = getModuleProgress(prevModule)
-    return progress.percent >= 50
+    const prog = getModuleProgress(prevModule)
+    return prog.percent >= 50
+  }
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    )
   }
 
   return (
@@ -90,7 +147,7 @@ export default function ModulesPage() {
                 </div>
                 <div className="text-right">
                   <div className="text-3xl font-bold text-primary">
-                    {Math.round(modules.reduce((acc, m) => acc + getModuleProgress(m).percent, 0) / modules.length)}%
+                    {modules.length > 0 ? Math.round(modules.reduce((acc, m) => acc + getModuleProgress(m).percent, 0) / modules.length) : 0}%
                   </div>
                   <p className="text-sm text-muted-foreground">Overall Progress</p>
                 </div>
@@ -105,15 +162,15 @@ export default function ModulesPage() {
           <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-border hidden lg:block" />
 
           <div className="space-y-4">
-            {modules.sort((a, b) => a.order - b.order).map((module) => {
-              const progress = getModuleProgress(module)
-              const moduleXp = getModuleXp(module)
-              const unlocked = isModuleUnlocked(module.order)
-              const isComplete = progress.percent === 100
+            {modules.sort((a, b) => a.order_index - b.order_index).map((mod) => {
+              const prog = getModuleProgress(mod)
+              const moduleXp = getModuleXp(mod)
+              const unlocked = isModuleUnlocked(mod.order_index)
+              const isComplete = prog.percent === 100
 
               return (
                 <motion.div
-                  key={module.id}
+                  key={mod.id}
                   variants={item}
                   className="relative"
                 >
@@ -145,13 +202,13 @@ export default function ModulesPage() {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-3">
-                              <h3 className="text-lg font-semibold">{module.name}</h3>
-                              <span className="text-xs text-muted-foreground">Module {module.order}</span>
+                              <h3 className="text-lg font-semibold">{mod.name}</h3>
+                              <span className="text-xs text-muted-foreground">Module {mod.order_index}</span>
                             </div>
-                            <p className="text-muted-foreground mt-1">{module.description}</p>
+                            <p className="text-muted-foreground mt-1">{mod.description}</p>
                             <div className="flex items-center gap-4 mt-3">
                               <span className="text-sm text-muted-foreground">
-                                {progress.solved}/{progress.total} problems
+                                {prog.solved}/{prog.total} problems
                               </span>
                               <span className="flex items-center gap-1 text-sm text-primary">
                                 <Zap className="h-4 w-4" />
@@ -165,13 +222,13 @@ export default function ModulesPage() {
                           <div className="w-full">
                             <div className="flex items-center justify-between text-sm mb-1">
                               <span className="text-muted-foreground">Progress</span>
-                              <span className="font-medium">{Math.round(progress.percent)}%</span>
+                              <span className="font-medium">{Math.round(prog.percent)}%</span>
                             </div>
-                            <Progress value={progress.percent} className="h-2" />
+                            <Progress value={prog.percent} className="h-2" />
                           </div>
                           
                           {unlocked && (
-                            <Link href={`/problems?module=${module.id}`}>
+                            <Link href={`/problems?module=${mod.id}`}>
                               <Button 
                                 variant={isComplete ? 'outline' : 'default'} 
                                 size="sm" 

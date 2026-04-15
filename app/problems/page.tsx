@@ -119,7 +119,7 @@ export default function ProblemsPage() {
     <AppLayout>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
           <div>
             <h1 className="text-2xl font-bold">Problems</h1>
             <p className="text-muted-foreground">
@@ -129,16 +129,22 @@ export default function ProblemsPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {(['Easy', 'Medium', 'Hard'] as const).map((diff) => {
             const total = problemsWithProgress.filter(p => p.difficulty === diff).length
             const solved = problemsWithProgress.filter(p => p.difficulty === diff && p.solved).length
+            const toneClasses =
+              diff === 'Easy'
+                ? 'bg-easy/5 border-easy/20 text-easy'
+                : diff === 'Medium'
+                  ? 'bg-medium/5 border-medium/20 text-medium'
+                  : 'bg-hard/5 border-hard/20 text-hard'
             return (
-              <Card key={diff} className={`bg-${diff.toLowerCase()}/5 border-${diff.toLowerCase()}/20`}>
+              <Card key={diff} className={toneClasses}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
-                    <span className={`text-${diff.toLowerCase()} font-medium`}>{diff}</span>
-                    <span className={`text-2xl font-bold text-${diff.toLowerCase()}`}>{solved}/{total}</span>
+                    <span className="font-medium">{diff}</span>
+                    <span className="text-2xl font-bold">{solved}/{total}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -230,8 +236,8 @@ export default function ProblemsPage() {
             <CardTitle>Problem List ({filteredProblems.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <div className="grid grid-cols-12 gap-4 p-4 bg-secondary/50 text-sm font-medium text-muted-foreground">
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <div className="hidden min-w-[760px] grid-cols-12 gap-4 bg-secondary/50 p-4 text-sm font-medium text-muted-foreground md:grid">
                 <div className="col-span-1">Status</div>
                 <div className="col-span-5">Problem</div>
                 <div className="col-span-2">Topic</div>
@@ -249,7 +255,7 @@ export default function ProblemsPage() {
                   >
                     <Link href={`/problems/${problem.id}`}>
                       <motion.div
-                        className="grid grid-cols-12 gap-4 p-4 border-t border-border hover:bg-secondary/30 transition-colors cursor-pointer items-center"
+                        className="grid min-w-[760px] grid-cols-12 items-center gap-4 border-t border-border p-4 transition-colors hover:bg-secondary/30 md:grid"
                         whileHover={{ x: 4 }}
                       >
                         <div className="col-span-1">

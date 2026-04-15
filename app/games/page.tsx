@@ -126,7 +126,7 @@ const quizQuestions = [
 type GameType = 'none' | 'classification' | 'quiz' | 'spam' | 'algorithm'
 
 export default function GamesPage() {
-  const { addXp, gameScores, updateGameScore } = useAppStore()
+  const { gameScores, updateGameScore } = useAppStore()
   const [activeGame, setActiveGame] = useState<GameType>('none')
   const [classificationScore, setClassificationScore] = useState(0)
   const [currentItemIndex, setCurrentItemIndex] = useState(0)
@@ -149,6 +149,19 @@ export default function GamesPage() {
   const [algoSelected, setAlgoSelected] = useState<number | null>(null)
   const [algoShowExplanation, setAlgoShowExplanation] = useState(false)
 
+  const awardXp = async (xp: number) => {
+    if (xp <= 0) return
+    try {
+      await fetch('/api/leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ xpEarned: xp }),
+      })
+    } catch {
+      // Do not block game flow if XP sync fails.
+    }
+  }
+
   const handleCategorySelect = (category: string) => {
     const currentItem = classificationItems[currentItemIndex]
     const isCorrect = category === currentItem.category
@@ -169,7 +182,7 @@ export default function GamesPage() {
         const finalScore = classificationScore + (isCorrect ? 10 : 0)
         const xp = Math.round(finalScore / 2)
         setXpGained(xp)
-        addXp(xp)
+        awardXp(xp)
         updateGameScore('classification', finalScore)
         setShowXpAnimation(true)
         setTimeout(() => {
@@ -204,7 +217,7 @@ export default function GamesPage() {
       // Quiz complete
       const xp = quizScore + (selectedAnswer === quizQuestions[currentQuestionIndex].correct ? 20 : 0)
       setXpGained(Math.round(xp / 2))
-      addXp(Math.round(xp / 2))
+      awardXp(Math.round(xp / 2))
       updateGameScore('quiz', xp)
       setShowXpAnimation(true)
       setTimeout(() => {
@@ -238,7 +251,7 @@ export default function GamesPage() {
         const finalScore = spamScore + (isCorrect ? 15 : 0)
         const xp = Math.round(finalScore / 3)
         setXpGained(xp)
-        addXp(xp)
+        awardXp(xp)
         updateGameScore('spam', finalScore)
         setShowXpAnimation(true)
         setTimeout(() => {
@@ -271,7 +284,7 @@ export default function GamesPage() {
       const finalScore = algoScore + (algoSelected === algorithmProblems[algoIndex].correct ? 20 : 0)
       const xp = Math.round(finalScore / 2)
       setXpGained(xp)
-      addXp(xp)
+      awardXp(xp)
       updateGameScore('algorithm', finalScore)
       setShowXpAnimation(true)
       setTimeout(() => {

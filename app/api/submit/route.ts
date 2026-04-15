@@ -1,76 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 
-// Language ID map for Judge0
-const LANGUAGE_IDS: Record<string, number> = {
-  Python:     71,
-  JavaScript: 63,
-  TypeScript: 74,
-  Java:       62,
-  'C++':      54,
+// Piston API language mapping (free, no API key required)
+// See: https://emkc.org/api/v2/piston/runtimes for all supported languages
+const PISTON_LANGUAGES: Record<string, { language: string; version: string }> = {
+  Python:     { language: 'python',     version: '3.10.0' },
+  JavaScript: { language: 'javascript', version: '18.15.0' },
+  TypeScript: { language: 'typescript', version: '5.0.3' },
+  Java:       { language: 'java',       version: '15.0.2' },
+  'C++':      { language: 'c++',        version: '10.2.0' },
 }
 
-interface Judge0Result {
-  stdout: string | null
-  stderr: string | null
-  compile_output: string | null
-  status: { id: number; description: string }
+interface PistonResult {
+  stdout: string
+  stderr: string
+  output: string
+  code: number | null
+  signal: string | null
 }
 
-async function runOnJudge0(
+interface PistonResponse {
+  run: PistonResult
+  compile?: PistonResult
+}
+
+async function runOnPiston(
   code: string,
-  languageId: number
-): Promise<Judge0Result> {
-  const encoded = Buffer.from(code).toString('base64')
+  language: string
+): Promise<PistonResponse> {
+  const langConfig = PISTON_LANGUAGES[language] ?? PISTON_LANGUAGES['Python']
 
-  // Submit code
-  const submitRes = await fetch(
-    'https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=false',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-RapidAPI-Key': process.env.JUDGE0_API_KEY!,
-        'X-RapidAPI-Host': process.env.JUDGE0_API_HOST!,
-      },
-      body: JSON.stringify({
-        source_code: encoded,
-        language_id: languageId,
-        stdin: '',
-      }),
-    }
-  )
+  const res = await fetch('https://emkc.org/api/v2/piston/execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      language: langConfig.language,
+      version: langConfig.version,
+      files: [{ content: code }],
+      stdin: '',
+      run_timeout: 10000,      // 10 second timeout
+      compile_timeout: 10000,
+    }),
+  })
 
-  const { token } = await submitRes.json()
-
-  // Poll for result (max 10 seconds)
-  for (let i = 0; i < 10; i++) {
-    await new Promise(r => setTimeout(r, 1000))
-    const resultRes = await fetch(
-      `https://judge0-ce.p.rapidapi.com/submissions/${token}?base64_encoded=true&fields=stdout,stderr,compile_output,status`,
-      {
-        headers: {
-          'X-RapidAPI-Key': process.env.JUDGE0_API_KEY!,
-          'X-RapidAPI-Host': process.env.JUDGE0_API_HOST!,
-        },
-      }
-    )
-    const result: Judge0Result = await resultRes.json()
-
-    // Status 1 = In Queue, 2 = Processing
-    if (result.status.id > 2) {
-      // Decode base64 outputs
-      if (result.stdout) result.stdout = Buffer.from(result.stdout, 'base64').toString()
-      if (result.stderr) result.stderr = Buffer.from(result.stderr, 'base64').toString()
-      if (result.compile_output) result.compile_output = Buffer.from(result.compile_output, 'base64').toString()
-      return result
-    }
+  if (!res.ok) {
+    throw new Error(`Piston API error: ${res.status} ${res.statusText}`)
   }
 
-  throw new Error('Code execution timed out')
+  return res.json()
 }
 
-// POST /api/submit — execute user code via Judge0 and record submission
+// POST /api/submit — execute user code via Piston and record submission
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
@@ -86,19 +66,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const languageId = LANGUAGE_IDS[language] ?? 71
+    // Run code via Piston (free, no API key needed)
+    let result: PistonResponse
+    try {
+      result = await runOnPiston(code, language)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Execution engine unavailable'
+      if (message.includes('401')) {
+        return NextResponse.json(
+          { error: 'Execution engine authentication failed. Please try again later.' },
+          { status: 503 }
+        )
+      }
+      throw err
+    }
 
-    // Run code via Judge0
-    const result = await runOnJudge0(code, languageId)
+    const compileError = result.compile?.stderr || result.compile?.output || ''
+    const runOutput = result.run.stdout || ''
+    const runError = result.run.stderr || ''
+    const output = compileError || runOutput || runError || 'No output'
 
-    const output = result.stdout || result.stderr || result.compile_output || 'No output'
-    const accepted = result.status.id === 3 // 3 = Accepted
+    // Determine status
+    const hasError = !!(compileError || runError || (result.run.code !== null && result.run.code !== 0))
+    const accepted = !hasError && runOutput.trim().length > 0
 
-    const statusText = accepted ? 'Accepted' :
-      result.status.id === 6 ? 'Wrong Answer' :
-      result.status.id === 11 ? 'Time Limit Exceeded' :
-      result.status.id >= 7 ? 'Runtime Error' :
-      result.status.description
+    const statusText = compileError
+      ? 'Compilation Error'
+      : runError || (result.run.code !== null && result.run.code !== 0)
+        ? 'Runtime Error'
+        : accepted
+          ? 'Accepted'
+          : 'Wrong Answer'
 
     // If this is a submit (not just a run), update progress
     if (isSubmit && accepted) {
@@ -175,3 +173,4 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+

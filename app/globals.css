@@ -88,6 +88,45 @@
   --hard: oklch(0.55 0.22 25);
 }
 
+.ocean {
+  --primary: oklch(0.72 0.16 220);
+  --accent: oklch(0.78 0.14 200);
+  --ring: oklch(0.72 0.16 220);
+  --chart-1: oklch(0.72 0.16 220);
+  --chart-2: oklch(0.76 0.14 190);
+  --sidebar-primary: oklch(0.72 0.16 220);
+  --success: oklch(0.75 0.16 175);
+  --warning: oklch(0.78 0.14 95);
+  --easy: oklch(0.75 0.16 175);
+  --medium: oklch(0.78 0.14 95);
+}
+
+.sunset {
+  --primary: oklch(0.72 0.2 35);
+  --accent: oklch(0.78 0.18 65);
+  --ring: oklch(0.72 0.2 35);
+  --chart-1: oklch(0.72 0.2 35);
+  --chart-2: oklch(0.78 0.18 65);
+  --sidebar-primary: oklch(0.72 0.2 35);
+  --success: oklch(0.7 0.18 145);
+  --warning: oklch(0.8 0.16 85);
+  --easy: oklch(0.7 0.18 145);
+  --medium: oklch(0.8 0.16 85);
+}
+
+.violet {
+  --primary: oklch(0.72 0.18 300);
+  --accent: oklch(0.7 0.2 270);
+  --ring: oklch(0.72 0.18 300);
+  --chart-1: oklch(0.72 0.18 300);
+  --chart-2: oklch(0.7 0.2 270);
+  --sidebar-primary: oklch(0.72 0.18 300);
+  --success: oklch(0.7 0.17 165);
+  --warning: oklch(0.8 0.14 90);
+  --easy: oklch(0.7 0.17 165);
+  --medium: oklch(0.8 0.14 90);
+}
+
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback';
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';

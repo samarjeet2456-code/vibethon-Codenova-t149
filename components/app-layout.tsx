@@ -55,9 +55,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       <AppSidebar />
-      <div className="pl-64">
+      <div className="lg:pl-64">
         <Topbar />
-        <main className="p-6">
+        <main className="p-4 md:p-6">
           {children}
         </main>
       </div>
